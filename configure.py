@@ -1487,6 +1487,18 @@ def configure_napi(output):
   version = getnapibuildversion.get_napi_version()
   output['variables']['napi_build_version'] = version
 
+def run_in_shell(cmd):
+  print("Running %s ..." % cmd)
+  subprocess.check_call(cmd, shell=True)
+  print("... done")
+
+# Ugly hack for ugly build system
+def configure_jemalloc_gen():
+  print('Running autogen.sh and configure')
+  run_in_shell(
+    "cd deps/jemalloc && " + 
+    "./autogen.sh")
+
 def configure_library(lib, output, pkgname=None):
   shared_lib = 'shared_' + lib
   output['variables']['node_' + shared_lib] = b(getattr(options, shared_lib))
@@ -2066,6 +2078,7 @@ flavor = GetFlavor(flavor_params)
 configure_node(output)
 configure_node_lib_files(output)
 configure_napi(output)
+configure_jemalloc_gen()
 configure_library('jemalloc', output)
 configure_library('zlib', output)
 configure_library('http_parser', output)
