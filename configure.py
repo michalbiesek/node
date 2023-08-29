@@ -265,6 +265,12 @@ shared_optgroup.add_argument('--shared-libuv',
     default=None,
     help='link to a shared libuv DLL instead of static linking')
 
+shared_optgroup.add_argument('--shared-jemalloc',
+    action='store_true',
+    dest='shared_jemalloc',
+    default=None,
+    help='link to a shared jemalloc DLL instead of static linking')
+
 shared_optgroup.add_argument('--shared-libuv-includes',
     action='store',
     dest='shared_libuv_includes',
@@ -2060,6 +2066,7 @@ flavor = GetFlavor(flavor_params)
 configure_node(output)
 configure_node_lib_files(output)
 configure_napi(output)
+configure_library('jemalloc', output)
 configure_library('zlib', output)
 configure_library('http_parser', output)
 configure_library('libuv', output)
