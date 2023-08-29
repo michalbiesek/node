@@ -168,11 +168,10 @@
       ],
     }],
     [ 'node_shared_jemalloc=="false"', {
-      'dependencies': [ 'deps/jemalloc/jemalloc.gyp:jemalloc' ],
       'conditions': [
         [ 'force_load=="true"', {
           'conditions': [
-            ['OS!="aix" and OS!="ios" and node_shared=="false"', {
+            ['OS=="linux" and node_shared=="false"', {
               'ldflags': [
                 '-Wl,--whole-archive',
                 '<(obj_dir)/deps/jemalloc/<(STATIC_LIB_PREFIX)jemalloc<(STATIC_LIB_SUFFIX)',
@@ -183,7 +182,7 @@
         }],
       ],
     }],
-    
+
 
     [ 'node_shared_http_parser=="false"', {
       'dependencies': [

@@ -1492,12 +1492,16 @@ def run_in_shell(cmd):
   subprocess.check_call(cmd, shell=True)
   print("... done")
 
-# Ugly hack for ugly build system
+# Ugly hack just to adjust to the gyp
 def configure_jemalloc_gen():
   print('Running autogen.sh and configure')
   run_in_shell(
     "cd deps/jemalloc && " + 
-    "./autogen.sh")
+    "./autogen.sh && " +
+    "make &&" +
+    "cd ../.. &&" +
+    "mkdir -p out/Release/obj.target/deps/jemalloc/ &&" +
+    "cp deps/jemalloc/lib/libjemalloc.a out/Release/obj.target/deps/jemalloc/libjemalloc.a")
 
 def configure_library(lib, output, pkgname=None):
   shared_lib = 'shared_' + lib
