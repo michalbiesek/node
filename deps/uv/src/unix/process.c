@@ -75,7 +75,7 @@ extern char **environ;
 
 
 #ifdef UV_USE_SIGCHLD
-static void uv__chld(uv_signal_t* handle, int signum) {
+static void uv__chld(uv_signal_t* handle, int signum, uv_pid_t pid, int uid, int sigvalue, int sigcode) {
   assert(signum == SIGCHLD);
   uv__wait_children(handle->loop);
 }
@@ -1082,13 +1082,17 @@ error:
 }
 
 
-int uv_process_kill(uv_process_t* process, int signum) {
-  return uv_kill(process->pid, signum);
+int uv_process_kill(uv_process_t* process, int signum, int sigval) {
+  return uv_kill(process->pid, signum, sigval);
 }
 
 
-int uv_kill(int pid, int signum) {
+int uv_kill(int pid, int signum, int sigval) {
+#if defined(__linux__)
+  if (sigqueue(pid, signum, sigval)) {
+#else
   if (kill(pid, signum)) {
+#endif
 #if defined(__MVS__)
     /* EPERM is returned if the process is a zombie. */
     siginfo_t infop;
