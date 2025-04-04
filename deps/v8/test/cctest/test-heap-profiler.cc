@@ -30,7 +30,6 @@
 #include <ctype.h>
 
 #include <memory>
-#include <vector>
 
 #include "include/v8-function.h"
 #include "include/v8-json.h"
@@ -916,7 +915,7 @@ TEST(HeapSnapshotAddressReuse) {
   CompileRun(
       "for (var i = 0; i < 10000; ++i)\n"
       "  a[i] = new A();\n");
-  CcTest::CollectAllGarbage();
+  i::heap::InvokeMajorGC(CcTest::heap());
 
   const v8::HeapSnapshot* snapshot2 = heap_profiler->TakeHeapSnapshot();
   CHECK(ValidateSnapshot(snapshot2));
@@ -958,7 +957,7 @@ TEST(HeapEntryIdsAndArrayShift) {
       "for (var i = 0; i < 1; ++i)\n"
       "  a.shift();\n");
 
-  CcTest::CollectAllGarbage();
+  i::heap::InvokeMajorGC(CcTest::heap());
 
   const v8::HeapSnapshot* snapshot2 = heap_profiler->TakeHeapSnapshot();
   CHECK(ValidateSnapshot(snapshot2));
@@ -999,7 +998,7 @@ TEST(HeapEntryIdsAndGC) {
   const v8::HeapSnapshot* snapshot1 = heap_profiler->TakeHeapSnapshot();
   CHECK(ValidateSnapshot(snapshot1));
 
-  CcTest::CollectAllGarbage();
+  i::heap::InvokeMajorGC(CcTest::heap());
 
   const v8::HeapSnapshot* snapshot2 = heap_profiler->TakeHeapSnapshot();
   CHECK(ValidateSnapshot(snapshot2));
@@ -1272,7 +1271,7 @@ TEST(HeapSnapshotObjectsStats) {
   // We have to call GC 6 times. In other case the garbage will be
   // the reason of flakiness.
   for (int i = 0; i < 6; ++i) {
-    CcTest::CollectAllGarbage();
+    i::heap::InvokeMajorGC(CcTest::heap());
   }
 
   v8::SnapshotObjectId initial_id;
@@ -1427,7 +1426,7 @@ TEST(HeapObjectIds) {
   }
 
   heap_profiler->StopTrackingHeapObjects();
-  CcTest::CollectAllAvailableGarbage();
+  i::heap::InvokeMemoryReducingMajorGCs(CcTest::heap());
 
   for (int i = 0; i < kLength; i++) {
     v8::SnapshotObjectId id = heap_profiler->GetObjectId(objects[i]);
@@ -1806,7 +1805,11 @@ TEST(NativeSnapshotObjectId) {
 TEST(NativeSnapshotObjectIdMoving) {
   if (i::v8_flags.enable_third_party_heap) return;
   // Required to allow moving specific objects.
-  i::v8_flags.manual_evacuation_candidates_selection = true;
+  i::ManualGCScope manual_gc_scope;
+  i::heap::ManualEvacuationCandidatesSelectionScope
+      manual_evacuation_candidate_selection_scope(manual_gc_scope);
+  // Concurrent allocation writes page flags in a racy way.
+  i::v8_flags.stress_concurrent_allocation = false;
 
   LocalContext env;
   v8::Isolate* isolate = env->GetIsolate();
@@ -1844,7 +1847,7 @@ TEST(NativeSnapshotObjectIdMoving) {
         v8::Utils::OpenHandle(*v8::Local<v8::String>::Cast(local)));
     i::heap::ForceEvacuationCandidate(i::Page::FromHeapObject(*internal));
   }
-  CcTest::CollectAllGarbage();
+  i::heap::InvokeMajorGC(CcTest::heap());
 
   non_merged_id = heap_profiler->GetObjectId(&native1);
   CHECK_NE(v8::HeapProfiler::kUnknownObjectId, non_merged_id);
@@ -2734,7 +2737,7 @@ TEST(CheckCodeNames) {
   const char* builtin_path1[] = {
       "::(GC roots)",
       "::(Builtins)",
-      "::(KeyedLoadIC_PolymorphicName builtin handle)",
+      "::(KeyedLoadIC_PolymorphicName builtin code)",
   };
   const v8::HeapGraphNode* node = GetNodeByPath(
       env->GetIsolate(), snapshot, builtin_path1, arraysize(builtin_path1));
@@ -2743,13 +2746,13 @@ TEST(CheckCodeNames) {
   const char* builtin_path2[] = {
       "::(GC roots)",
       "::(Builtins)",
-      "::(CompileLazy builtin handle)",
+      "::(CompileLazy builtin code)",
   };
   node = GetNodeByPath(env->GetIsolate(), snapshot, builtin_path2,
                        arraysize(builtin_path2));
   CHECK(node);
   v8::String::Utf8Value node_name(env->GetIsolate(), node->GetName());
-  CHECK_EQ(0, strcmp("(CompileLazy builtin handle)", *node_name));
+  CHECK_EQ(0, strcmp("(CompileLazy builtin code)", *node_name));
 }
 
 
@@ -2794,8 +2797,8 @@ static const char* record_trace_tree_source =
 "\n"
 "for (var i = 0; i < 100; i++) start();\n";
 
-static AllocationTraceNode* FindNode(
-    AllocationTracker* tracker, const v8::base::Vector<const char*>& names) {
+static AllocationTraceNode* FindNode(AllocationTracker* tracker,
+                                     v8::base::Vector<const char*> names) {
   AllocationTraceNode* node = tracker->trace_tree()->root();
   for (int i = 0; node != nullptr && i < names.length(); i++) {
     const char* name = names[i];
@@ -3598,7 +3601,7 @@ TEST(AddressToTraceMap) {
 
 static const v8::AllocationProfile::Node* FindAllocationProfileNode(
     v8::Isolate* isolate, v8::AllocationProfile* profile,
-    const v8::base::Vector<const char*>& names) {
+    v8::base::Vector<const char*> names) {
   v8::AllocationProfile::Node* node = profile->GetRootNode();
   for (int i = 0; node != nullptr && i < names.length(); ++i) {
     const char* name = names[i];
@@ -3715,7 +3718,7 @@ TEST(SamplingHeapProfiler) {
         "  eval(\"new Array(100)\");\n"
         "}\n");
 
-    CcTest::CollectAllGarbage();
+    i::heap::InvokeMajorGC(CcTest::heap());
 
     std::unique_ptr<v8::AllocationProfile> profile(
         heap_profiler->GetAllocationProfile());
@@ -3897,7 +3900,7 @@ TEST(SamplingHeapProfilerLeftTrimming) {
       "      a.shift();\n"
       "}\n");
 
-  CcTest::CollectGarbage(i::NEW_SPACE);
+  i::heap::InvokeMinorGC(CcTest::heap());
   // Should not crash.
 
   heap_profiler->StopSamplingHeapProfiler();
@@ -4061,67 +4064,6 @@ TEST(SamplingHeapProfilerSampleDuringDeopt) {
   heap_profiler->StopSamplingHeapProfiler();
 }
 
-namespace {
-class TestQueryObjectPredicate : public v8::QueryObjectPredicate {
- public:
-  TestQueryObjectPredicate(v8::Local<v8::Context> context,
-                           v8::Local<v8::Symbol> symbol)
-      : context_(context), symbol_(symbol) {}
-
-  bool Filter(v8::Local<v8::Object> object) override {
-    return object->HasOwnProperty(context_, symbol_).FromMaybe(false);
-  }
-
- private:
-  v8::Local<v8::Context> context_;
-  v8::Local<v8::Symbol> symbol_;
-};
-
-class IncludeAllQueryObjectPredicate : public v8::QueryObjectPredicate {
- public:
-  IncludeAllQueryObjectPredicate() {}
-  bool Filter(v8::Local<v8::Object> object) override { return true; }
-};
-}  // anonymous namespace
-
-TEST(QueryObjects) {
-  LocalContext env;
-  v8::Isolate* isolate = env->GetIsolate();
-  v8::HandleScope scope(isolate);
-  v8::Local<v8::Context> context = env.local();
-
-  v8::Local<v8::Symbol> sym =
-      v8::Symbol::New(isolate, v8_str("query_object_test"));
-  context->Global()->Set(context, v8_str("test_symbol"), sym).Check();
-  v8::Local<v8::Value> arr = CompileRun(R"(
-      const arr = [];
-      for (let i = 0; i < 10; ++i) {
-        arr.push({[test_symbol]: true});
-      }
-      arr;
-    )");
-  context->Global()->Set(context, v8_str("arr"), arr).Check();
-  v8::HeapProfiler* heap_profiler = isolate->GetHeapProfiler();
-
-  {
-    TestQueryObjectPredicate predicate(context, sym);
-    std::vector<v8::Global<v8::Object>> out;
-    heap_profiler->QueryObjects(context, &predicate, &out);
-
-    CHECK_EQ(out.size(), 10);
-    for (size_t i = 0; i < out.size(); ++i) {
-      CHECK(out[i].Get(isolate)->HasOwnProperty(context, sym).FromMaybe(false));
-    }
-  }
-
-  {
-    IncludeAllQueryObjectPredicate predicate;
-    std::vector<v8::Global<v8::Object>> out;
-    heap_profiler->QueryObjects(context, &predicate, &out);
-    CHECK_GE(out.size(), 10);
-  }
-}
-
 TEST(WeakReference) {
   v8::Isolate* isolate = CcTest::isolate();
   i::Isolate* i_isolate = CcTest::i_isolate();
@@ -4221,6 +4163,8 @@ TEST(HeapSnapshotDeleteDuringTakeSnapshot) {
   v8::HeapProfiler* heap_profiler = env->GetIsolate()->GetHeapProfiler();
   int gc_calls = 0;
   v8::Global<v8::Object> handle;
+  v8::Isolate* isolate = env->GetIsolate();
+  i::Heap* heap = reinterpret_cast<i::Isolate*>(isolate)->heap();
 
   {
     struct WeakData {
@@ -4231,8 +4175,8 @@ TEST(HeapSnapshotDeleteDuringTakeSnapshot) {
     WeakData* data =
         new WeakData{heap_profiler->TakeHeapSnapshot(), &gc_calls, &handle};
 
-    v8::HandleScope inner_scope(env->GetIsolate());
-    handle.Reset(env->GetIsolate(), v8::Object::New(env->GetIsolate()));
+    v8::HandleScope inner_scope(isolate);
+    handle.Reset(isolate, v8::Object::New(isolate));
     handle.SetWeak(
         data,
         [](const v8::WeakCallbackInfo<WeakData>& data) {
@@ -4245,6 +4189,13 @@ TEST(HeapSnapshotDeleteDuringTakeSnapshot) {
   }
   CHECK_EQ(gc_calls, 0);
 
-  CHECK(ValidateSnapshot(heap_profiler->TakeHeapSnapshot()));
+  // We need to invoke GC without stack, otherwise some objects may survive.
+  i::DisableConservativeStackScanningScopeForTesting no_stack_scanning(heap);
+  // For the same reason, we need to take the snapshot without scanning the
+  // stack.
+  v8::HeapProfiler::HeapSnapshotOptions options;
+  options.stack_state = cppgc::EmbedderStackState::kNoHeapPointers;
+
+  CHECK(ValidateSnapshot(heap_profiler->TakeHeapSnapshot(options)));
   CHECK_EQ(gc_calls, 1);
 }

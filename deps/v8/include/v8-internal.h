@@ -12,7 +12,6 @@
 #include <atomic>
 #include <type_traits>
 
-#include "v8-version.h"  // NOLINT(build/include_directory)
 #include "v8config.h"    // NOLINT(build/include_directory)
 
 namespace v8 {
@@ -80,7 +79,7 @@ struct SmiTagging<4> {
       static_cast<intptr_t>(kUintptrAllBitsSet << (kSmiValueSize - 1));
   static constexpr intptr_t kSmiMaxValue = -(kSmiMinValue + 1);
 
-  V8_INLINE static int SmiToInt(Address value) {
+  V8_INLINE static constexpr int SmiToInt(Address value) {
     int shift_bits = kSmiTagSize + kSmiShiftSize;
     // Truncate and shift down (requires >> to be sign extending).
     return static_cast<int32_t>(static_cast<uint32_t>(value)) >> shift_bits;
@@ -105,7 +104,7 @@ struct SmiTagging<8> {
       static_cast<intptr_t>(kUintptrAllBitsSet << (kSmiValueSize - 1));
   static constexpr intptr_t kSmiMaxValue = -(kSmiMinValue + 1);
 
-  V8_INLINE static int SmiToInt(Address value) {
+  V8_INLINE static constexpr int SmiToInt(Address value) {
     int shift_bits = kSmiTagSize + kSmiShiftSize;
     // Shift down and throw away top 32 bits.
     return static_cast<int>(static_cast<intptr_t>(value) >> shift_bits);
@@ -259,8 +258,10 @@ static const uint32_t kExternalPointerIndexShift = 5;
 #endif  // V8_TARGET_OS_ANDROID
 
 // The maximum number of entries in an external pointer table.
+static const int kExternalPointerTableEntrySize = 8;
+static const int kExternalPointerTableEntrySizeLog2 = 3;
 static const size_t kMaxExternalPointers =
-    kExternalPointerTableReservationSize / kApiSystemPointerSize;
+    kExternalPointerTableReservationSize / kExternalPointerTableEntrySize;
 static_assert((1 << (32 - kExternalPointerIndexShift)) == kMaxExternalPointers,
               "kExternalPointerTableReservationSize and "
               "kExternalPointerIndexShift don't match");
@@ -430,7 +431,7 @@ constexpr uint64_t kAllExternalPointerTypeTags[] = {
   (HasMarkBit ? kExternalPointerMarkBit : 0))
 enum ExternalPointerTag : uint64_t {
   // Empty tag value. Mostly used as placeholder.
-  kExternalPointerNullTag =            MAKE_TAG(0, 0b00000000),
+  kExternalPointerNullTag =            MAKE_TAG(1, 0b00000000),
   // External pointer tag that will match any external pointer. Use with care!
   kAnyExternalPointerTag =             MAKE_TAG(1, 0b11111111),
   // The free entry tag has all type bits set so every type check with a
@@ -522,6 +523,8 @@ class Internals {
   static const int kBuiltinTier0TableSize = 7 * kApiSystemPointerSize;
   static const int kLinearAllocationAreaSize = 3 * kApiSystemPointerSize;
   static const int kThreadLocalTopSize = 25 * kApiSystemPointerSize;
+  static const int kHandleScopeDataSize =
+      2 * kApiSystemPointerSize + 2 * kApiInt32Size;
 
   // ExternalPointerTable layout guarantees.
   static const int kExternalPointerTableBufferOffset = 0;
@@ -551,19 +554,23 @@ class Internals {
       kIsolateFastApiCallTargetOffset + kApiSystemPointerSize;
   static const int kIsolateThreadLocalTopOffset =
       kIsolateLongTaskStatsCounterOffset + kApiSizetSize;
-  static const int kIsolateEmbedderDataOffset =
+  static const int kIsolateHandleScopeDataOffset =
       kIsolateThreadLocalTopOffset + kThreadLocalTopSize;
+  static const int kIsolateEmbedderDataOffset =
+      kIsolateHandleScopeDataOffset + kHandleScopeDataSize;
 #ifdef V8_COMPRESS_POINTERS
   static const int kIsolateExternalPointerTableOffset =
       kIsolateEmbedderDataOffset + kNumIsolateDataSlots * kApiSystemPointerSize;
   static const int kIsolateSharedExternalPointerTableAddressOffset =
       kIsolateExternalPointerTableOffset + kExternalPointerTableSize;
-  static const int kIsolateRootsOffset =
+  static const int kIsolateApiCallbackThunkArgumentOffset =
       kIsolateSharedExternalPointerTableAddressOffset + kApiSystemPointerSize;
 #else
-  static const int kIsolateRootsOffset =
+  static const int kIsolateApiCallbackThunkArgumentOffset =
       kIsolateEmbedderDataOffset + kNumIsolateDataSlots * kApiSystemPointerSize;
 #endif
+  static const int kIsolateRootsOffset =
+      kIsolateApiCallbackThunkArgumentOffset + kApiSystemPointerSize;
 
 #if V8_STATIC_ROOTS_BOOL
 
@@ -641,11 +648,11 @@ class Internals {
 #endif
   }
 
-  V8_INLINE static bool HasHeapObjectTag(Address value) {
+  V8_INLINE static constexpr bool HasHeapObjectTag(Address value) {
     return (value & kHeapObjectTagMask) == static_cast<Address>(kHeapObjectTag);
   }
 
-  V8_INLINE static int SmiValue(Address value) {
+  V8_INLINE static constexpr int SmiValue(Address value) {
     return PlatformSmiTagging::SmiToInt(value);
   }
 
@@ -900,57 +907,6 @@ class BackingStoreBase {};
 // The maximum value in enum GarbageCollectionReason, defined in heap.h.
 // This is needed for histograms sampling garbage collection reasons.
 constexpr int kGarbageCollectionReasonMaxValue = 27;
-
-// Helper functions about values contained in handles.
-class ValueHelper final {
- public:
-#ifdef V8_ENABLE_CONSERVATIVE_STACK_SCANNING
-  static constexpr Address kLocalTaggedNullAddress = 1;
-
-  template <typename T>
-  static constexpr T* EmptyValue() {
-    return reinterpret_cast<T*>(kLocalTaggedNullAddress);
-  }
-
-  template <typename T>
-  V8_INLINE static Address ValueAsAddress(const T* value) {
-    return reinterpret_cast<Address>(value);
-  }
-
-  template <typename T, typename S>
-  V8_INLINE static T* SlotAsValue(S* slot) {
-    return *reinterpret_cast<T**>(slot);
-  }
-
-  template <typename T>
-  V8_INLINE static T* ValueAsSlot(T* const& value) {
-    return reinterpret_cast<T*>(const_cast<T**>(&value));
-  }
-
-#else  // !V8_ENABLE_CONSERVATIVE_STACK_SCANNING
-
-  template <typename T>
-  static constexpr T* EmptyValue() {
-    return nullptr;
-  }
-
-  template <typename T>
-  V8_INLINE static Address ValueAsAddress(const T* value) {
-    return *reinterpret_cast<const Address*>(value);
-  }
-
-  template <typename T, typename S>
-  V8_INLINE static T* SlotAsValue(S* slot) {
-    return reinterpret_cast<T*>(slot);
-  }
-
-  template <typename T>
-  V8_INLINE static T* ValueAsSlot(T* const& value) {
-    return value;
-  }
-
-#endif  // V8_ENABLE_CONSERVATIVE_STACK_SCANNING
-};
 
 }  // namespace internal
 }  // namespace v8
