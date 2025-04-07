@@ -146,7 +146,7 @@
           '-Wno-restrict',
           '-Wno-array-bounds',
           '-Wno-nonnull',
-          '-Wno-dangling-pointer',
+          # '-Wno-dangling-pointer',
           # On by default in Clang and V8 requires it at least for arm64.
           '-flax-vector-conversions',
         ],
