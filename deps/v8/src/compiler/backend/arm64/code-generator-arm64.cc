@@ -426,18 +426,7 @@ class WasmOutOfLineTrap : public OutOfLineCode {
       __ Ret();
     } else {
       gen_->AssembleSourcePosition(instr_);
-      // A direct call to a wasm runtime stub defined in this module.
-      // Just encode the stub index. This will be patched when the code
-      // is added to the native module and copied into wasm code space.
-      if (gen_->IsWasm() || PointerCompressionIsEnabled()) {
-        __ Call(static_cast<Address>(trap_id), RelocInfo::WASM_STUB_CALL);
-      } else {
-        // For wasm traps inlined into JavaScript force indirect call if pointer
-        // compression is disabled as it can't be guaranteed that the built-in's
-        // address is close enough for a near call.
-        __ IndirectCall(static_cast<Address>(trap_id),
-                        RelocInfo::WASM_STUB_CALL);
-      }
+      __ Call(static_cast<Address>(trap_id), RelocInfo::WASM_STUB_CALL);
       ReferenceMap* reference_map =
           gen_->zone()->New<ReferenceMap>(gen_->zone());
       gen_->RecordSafepoint(reference_map);
@@ -775,7 +764,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
     case kArchCallBuiltinPointer: {
       DCHECK(!instr->InputAt(0)->IsImmediate());
       Register builtin_index = i.InputRegister(0);
-      __ CallBuiltinByIndex(builtin_index);
+      Register target =
+          instr->HasCallDescriptorFlag(CallDescriptor::kFixedTargetRegister)
+              ? kJavaScriptCallCodeStartRegister
+              : builtin_index;
+      __ CallBuiltinByIndex(builtin_index, target);
       RecordCallPosition(instr);
       frame_access_state()->ClearSPDelta();
       break;
@@ -1977,6 +1970,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
       __ Str(i.InputOrZeroRegister32(0), i.MemoryOperand(1));
       break;
+    case kArm64StrWPair:
+      EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
+      __ Stp(i.InputOrZeroRegister32(0), i.InputOrZeroRegister32(1),
+             i.MemoryOperand(2));
+      break;
     case kArm64Ldr:
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
       __ Ldr(i.OutputRegister(), i.MemoryOperand());
@@ -2003,6 +2001,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
     case kArm64Str:
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
       __ Str(i.InputOrZeroRegister64(0), i.MemoryOperand(1));
+      break;
+    case kArm64StrPair:
+      EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
+      __ Stp(i.InputOrZeroRegister64(0), i.InputOrZeroRegister64(1),
+             i.MemoryOperand(2));
       break;
     case kArm64StrCompressTagged:
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
@@ -2791,11 +2794,6 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       __ Movi(i.OutputSimd128Register().V16B(), imm2, imm1);
       break;
     }
-    case kArm64S128Zero: {
-      VRegister dst = i.OutputSimd128Register().V16B();
-      __ Eor(dst, dst, dst);
-      break;
-    }
       SIMD_BINOP_CASE(kArm64S128And, And, 16B);
       SIMD_BINOP_CASE(kArm64S128Or, Orr, 16B);
       SIMD_BINOP_CASE(kArm64S128Xor, Eor, 16B);
@@ -3148,11 +3146,17 @@ void CodeGenerator::AssembleArchSelect(Instruction* instr,
     __ Fcsel(i.OutputFloat32Register(),
              i.InputFloat32Register(true_value_index),
              i.InputFloat32Register(false_value_index), cc);
-  } else {
-    DCHECK_EQ(rep, MachineRepresentation::kFloat64);
+  } else if (rep == MachineRepresentation::kFloat64) {
     __ Fcsel(i.OutputFloat64Register(),
              i.InputFloat64Register(true_value_index),
              i.InputFloat64Register(false_value_index), cc);
+  } else if (rep == MachineRepresentation::kWord32) {
+    __ Csel(i.OutputRegister32(), i.InputRegister32(true_value_index),
+            i.InputRegister32(false_value_index), cc);
+  } else {
+    DCHECK_EQ(rep, MachineRepresentation::kWord64);
+    __ Csel(i.OutputRegister64(), i.InputRegister64(true_value_index),
+            i.InputRegister64(false_value_index), cc);
   }
 }
 

@@ -158,12 +158,6 @@ void* Allocate(void* hint, size_t size, OS::MemoryPermission access,
   int flags = GetFlagsForMemoryPermission(access, page_type);
   void* result = mmap(hint, size, prot, flags, kMmapFd, kMmapFdOffset);
   if (result == MAP_FAILED) return nullptr;
-
-#if V8_ENABLE_PRIVATE_MAPPING_FORK_OPTIMIZATION
-  // This is advisory, so we ignore errors.
-  madvise(result, size, MADV_DONTFORK);
-#endif
-
 #if ENABLE_HUGEPAGE
   if (result != nullptr && size >= kHugePageSize) {
     const uintptr_t huge_start =
@@ -485,6 +479,7 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
   int prot = GetProtectionFromMemoryPermission(access);
   int ret = mprotect(address, size, prot);
 
+  // Setting permissions can fail if the limit of VMAs is exceeded.
   // Any failure that's not OOM likely indicates a bug in the caller (e.g.
   // using an invalid mapping) so attempt to catch that here to facilitate
   // debugging of these failures.
@@ -521,10 +516,13 @@ bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
 
 // static
 void OS::SetDataReadOnly(void* address, size_t size) {
-  DCHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
-  DCHECK_EQ(0, size % CommitPageSize());
+  CHECK_EQ(0, reinterpret_cast<uintptr_t>(address) % CommitPageSize());
+  CHECK_EQ(0, size % CommitPageSize());
 
-  CHECK_EQ(0, mprotect(address, size, PROT_READ));
+  if (mprotect(address, size, PROT_READ) != 0) {
+    FATAL("Failed to protect data memory at %p +%zu; error %d\n", address, size,
+          errno);
+  }
 }
 
 // static
@@ -591,6 +589,7 @@ bool OS::DecommitPages(void* address, size_t size) {
   void* ret = mmap(address, size, PROT_NONE,
                    MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   if (V8_UNLIKELY(ret == MAP_FAILED)) {
+    // Decommitting pages can fail if the limit of VMAs is exceeded.
     CHECK_EQ(ENOMEM, errno);
     return false;
   }
@@ -924,10 +923,12 @@ void OS::FPrint(FILE* out, const char* format, ...) {
 
 void OS::VFPrint(FILE* out, const char* format, va_list args) {
 #if defined(ANDROID) && !defined(V8_ANDROID_LOG_STDOUT)
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
-#else
-  vfprintf(out, format, args);
+  if (out == stdout) {
+    __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
+    return;
+  }
 #endif
+  vfprintf(out, format, args);
 }
 
 
