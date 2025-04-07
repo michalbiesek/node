@@ -95,6 +95,8 @@
       '<(V8_ROOT)/src/inspector/v8-schema-agent-impl.h',
       '<(V8_ROOT)/src/inspector/v8-stack-trace-impl.cc',
       '<(V8_ROOT)/src/inspector/v8-stack-trace-impl.h',
+      '<(V8_ROOT)/src/inspector/v8-serialization-duplicate-tracker.cc',
+      '<(V8_ROOT)/src/inspector/v8-serialization-duplicate-tracker.h',
       '<(V8_ROOT)/src/inspector/v8-value-utils.cc',
       '<(V8_ROOT)/src/inspector/v8-value-utils.h',
       # '<(V8_ROOT)/src/inspector/v8-webdriver-serializer.cc',
