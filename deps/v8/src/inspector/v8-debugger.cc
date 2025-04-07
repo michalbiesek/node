@@ -8,12 +8,12 @@
 #include "include/v8-context.h"
 #include "include/v8-function.h"
 #include "include/v8-microtask-queue.h"
-#include "include/v8-profiler.h"
 #include "include/v8-util.h"
 #include "src/inspector/inspected-context.h"
 #include "src/inspector/protocol/Protocol.h"
 #include "src/inspector/string-util.h"
 #include "src/inspector/v8-debugger-agent-impl.h"
+#include "src/inspector/v8-heap-profiler-agent-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
@@ -38,7 +38,7 @@ void cleanupExpiredWeakPointers(Map& map) {
   }
 }
 
-class MatchPrototypePredicate : public v8::QueryObjectPredicate {
+class MatchPrototypePredicate : public v8::debug::QueryObjectPredicate {
  public:
   MatchPrototypePredicate(V8InspectorImpl* inspector,
                           v8::Local<v8::Context> context,
@@ -528,6 +528,12 @@ void V8Debugger::handleProgramBreak(
       });
   {
     v8::Context::Scope scope(pausedContext);
+
+    m_inspector->forEachSession(
+        contextGroupId, [](V8InspectorSessionImpl* session) {
+          session->heapProfilerAgent()->takePendingHeapSnapshots();
+        });
+
     m_inspector->client()->runMessageLoopOnPause(contextGroupId);
     m_pausedContextGroupId = 0;
   }
@@ -1005,7 +1011,7 @@ v8::Local<v8::Array> V8Debugger::queryObjects(v8::Local<v8::Context> context,
   v8::Isolate* isolate = context->GetIsolate();
   std::vector<v8::Global<v8::Object>> v8_objects;
   MatchPrototypePredicate predicate(m_inspector, context, prototype);
-  isolate->GetHeapProfiler()->QueryObjects(context, &predicate, &v8_objects);
+  v8::debug::QueryObjects(context, &predicate, &v8_objects);
 
   v8::MicrotasksScope microtasksScope(context,
                                       v8::MicrotasksScope::kDoNotRunMicrotasks);
