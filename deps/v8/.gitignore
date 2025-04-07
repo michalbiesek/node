@@ -73,7 +73,7 @@
 /third_party/colorama/src
 !/third_party/glibc
 !/third_party/googletest
-/third_party/googletest/src
+!/third_party/googletest/src
 !/third_party/test262-harness
 !/third_party/v8
 !/third_party/wasm-api
