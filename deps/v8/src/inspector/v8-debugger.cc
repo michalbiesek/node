@@ -38,7 +38,7 @@ void cleanupExpiredWeakPointers(Map& map) {
   }
 }
 
-class MatchPrototypePredicate : public v8::debug::QueryObjectPredicate {
+class MatchPrototypePredicate : public v8::QueryObjectPredicate {
  public:
   MatchPrototypePredicate(V8InspectorImpl* inspector,
                           v8::Local<v8::Context> context,
