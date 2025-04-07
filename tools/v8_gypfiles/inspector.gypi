@@ -79,6 +79,8 @@
       '<(V8_ROOT)/src/inspector/v8-debugger-id.h',
       '<(V8_ROOT)/src/inspector/v8-debugger-script.cc',
       '<(V8_ROOT)/src/inspector/v8-debugger-script.h',
+      '<(V8_ROOT)/src/inspector/v8-deep-serializer.cc',
+      '<(V8_ROOT)/src/inspector/v8-deep-serializer.h',
       '<(V8_ROOT)/src/inspector/v8-heap-profiler-agent-impl.cc',
       '<(V8_ROOT)/src/inspector/v8-heap-profiler-agent-impl.h',
       '<(V8_ROOT)/src/inspector/v8-inspector-impl.cc',
