@@ -117,7 +117,7 @@ class HeapProfiler : public HeapObjectAllocationTracker {
   Isolate* isolate() const;
 
   void QueryObjects(Handle<Context> context,
-                    v8::QueryObjectPredicate* predicate,
+                    QueryObjectPredicate* predicate,
                     std::vector<v8::Global<v8::Object>>* objects);
   void set_native_move_listener(
       std::unique_ptr<HeapProfilerNativeMoveListener> listener) {
