@@ -40,7 +40,7 @@
 .torquelint-cache
 .vscode
 /_*
-/base
+!/base
 /build
 /buildtools
 /check-header-includes
