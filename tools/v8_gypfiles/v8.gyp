@@ -300,12 +300,12 @@
           'sources': [
             '<(V8_ROOT)/src/builtins/riscv/builtins-riscv.cc',
           ],
-        }],        
+        }],
         ['v8_target_arch=="loong64" or v8_target_arch=="loong64"', {
           'sources': [
             '<(V8_ROOT)/src/builtins/loong64/builtins-loong64.cc',
           ],
-        }],        
+        }],
         ['v8_target_arch=="mips64" or v8_target_arch=="mips64el"', {
           'sources': [
             '<(V8_ROOT)/src/builtins/mips64/builtins-mips64.cc',
@@ -1018,7 +1018,7 @@
           'sources': [
             '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"v8_base_without_compiler.*?v8_enable_wasm_gdb_remote_debugging.*?v8_current_cpu == \\"riscv64\\".*?sources \\+= ")',
           ],
-        }],        
+        }],
         ['v8_target_arch=="loong64"', {
           'sources': [
             '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "\\"v8_base_without_compiler.*?v8_enable_wasm_gdb_remote_debugging.*?v8_current_cpu == \\"loong64\\".*?sources \\+= ")',
@@ -1035,7 +1035,7 @@
               ],
             }],
           ],
-        }],        
+        }],
         ['OS=="win"', {
           # This will prevent V8's .cc files conflicting with the inspector's
           # .cpp files in the same shard.
@@ -1440,6 +1440,8 @@
         '<(V8_ROOT)/src/libplatform/default-job.h',
         '<(V8_ROOT)/src/libplatform/default-platform.cc',
         '<(V8_ROOT)/src/libplatform/default-platform.h',
+        '<(V8_ROOT)/src/libplatform/default-thread-isolated-allocator.cc',
+        '<(V8_ROOT)/src/libplatform/default-thread-isolated-allocator.h',
         '<(V8_ROOT)/src/libplatform/default-worker-threads-task-runner.cc',
         '<(V8_ROOT)/src/libplatform/default-worker-threads-task-runner.h',
         '<(V8_ROOT)/src/libplatform/delayed-task-queue.cc',
