@@ -607,12 +607,12 @@
                 'conditions': [
                   ['OS=="linux" or OS=="mac" or OS=="ios" or OS=="freebsd"', {
                     'sources': [
-                      '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "v8_header_set.\\"v8_internal_headers\\".*?v8_enable_i18n_support.*?v8_current_cpu == \\"x64\\".*?v8_enable_webassembly.*?is_linux.*?sources \\+= ")',
+                      '<(V8_ROOT)/src/trap-handler/handler-inside-posix.h',
                     ],
                   }],
                   ['OS=="win"', {
                     'sources': [
-                      '<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "v8_header_set.\\"v8_internal_headers\\".*?v8_enable_i18n_support.*?v8_current_cpu == \\"x64\\".*?v8_enable_webassembly.*?is_win.*?sources \\+= ")',
+                      '<(V8_ROOT)/src/trap-handler/handler-inside-win.h',
                     ],
                   }],
                 ],
@@ -636,12 +636,12 @@
               }],
               ['v8_enable_webassembly==1', {
                 'conditions': [
-                  ['OS=="mac" or (_toolset=="host" and host_arch=="x64" and OS=="linux")', {
+                  ['((_toolset=="host" and host_arch=="arm64" or _toolset=="target" and target_arch=="arm64") and (OS=="linux" or OS=="mac")) or ((_toolset=="host" and host_arch=="x64" or _toolset=="target" and target_arch=="x64") and (OS=="linux" or OS=="mac"))', {
                     'sources': [
                       '<(V8_ROOT)/src/trap-handler/handler-inside-posix.h',
                     ],
                   }],
-                  ['_toolset=="host" and host_arch=="x64" and (OS=="linux" or OS=="mac" or OS=="win")', {
+                  ['(_toolset=="host" and host_arch=="x64" or _toolset=="target" and target_arch=="x64") and (OS=="linux" or OS=="mac" or OS=="win")', {
                     'sources': [
                       '<(V8_ROOT)/src/trap-handler/trap-handler-simulator.h',
                     ],
@@ -966,21 +966,19 @@
           'conditions': [
             ['v8_enable_webassembly==1', {
               'conditions': [
-                ['OS=="mac" or OS=="ios" or '
-                 '(_toolset=="host" and host_arch=="x64" and (host_os=="linux" or host_os=="mac"))', {
+                ['((_toolset=="host" and host_arch=="arm64" or _toolset=="target" and target_arch=="arm64") and (OS=="linux" or OS=="mac" or OS=="ios")) or ((_toolset=="host" and host_arch=="x64" or _toolset=="target" and target_arch=="x64") and (OS=="linux" or OS=="mac"))', {
                   'sources': [
                     '<(V8_ROOT)/src/trap-handler/handler-inside-posix.cc',
                     '<(V8_ROOT)/src/trap-handler/handler-outside-posix.cc',
                   ],
                 }],
-                ['_toolset=="host" and host_arch=="x64" and OS=="win"', {
+                ['(_toolset=="host" and host_arch=="x64" or _toolset=="target" and target_arch=="x64") and OS=="win"', {
                   'sources': [
                     '<(V8_ROOT)/src/trap-handler/handler-inside-win.cc',
                     '<(V8_ROOT)/src/trap-handler/handler-outside-win.cc',
                   ],
                 }],
-                ['_toolset=="host" and host_arch=="x64" and '
-                 '(host_os=="linux" or host_os=="mac" or OS=="win")', {
+                ['(_toolset=="host" and host_arch=="x64" or _toolset=="target" and target_arch=="x64") and (OS=="linux" or OS=="mac" or OS=="win")', {
                   'sources': [
                     '<(V8_ROOT)/src/trap-handler/handler-outside-simulator.cc',
                   ],
