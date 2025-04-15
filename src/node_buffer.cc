@@ -90,21 +90,17 @@ std::unique_ptr<BackingStore> CreateBackingStore(
     BackingStore::DeleterCallback deleter,
     void* deleter_data) {
 #ifdef V8_ENABLE_SANDBOX
-  // fprintf(stderr, "CreateBackingStore: Sandbox is enabled!\n");
-  
   // Get the allocator from the isolate
   std::unique_ptr<ArrayBuffer::Allocator> allocator(ArrayBuffer::Allocator::NewDefaultAllocator());
   // void* v8_data = allocator->Allocate(data.size());
   if (!allocator) {
-    fprintf(stderr, "Failed to get array buffer allocator\n");
     return nullptr;
   }
-  
+
   // Allocate memory using the isolate's allocator
   void* allocated_data = allocator->Allocate(byte_length);
   CHECK(allocated_data);
   if (!allocated_data) {
-    fprintf(stderr, "Failed to allocate memory\n");
     return nullptr;
   }
 
@@ -115,8 +111,8 @@ std::unique_ptr<BackingStore> CreateBackingStore(
 
   // Create the backing store with the allocated data
   auto store = ArrayBuffer::NewBackingStore(
-    allocated_data, 
-    byte_length, 
+    allocated_data,
+    byte_length,
     [](void* data, size_t length, void*) {
       std::unique_ptr<ArrayBuffer::Allocator> allocator(ArrayBuffer::Allocator::NewDefaultAllocator());
       allocator->Free(data, length);
@@ -125,14 +121,12 @@ std::unique_ptr<BackingStore> CreateBackingStore(
   );
 
   if (!store) {
-    fprintf(stderr, "Failed to create backing store\n");
     allocator->Free(allocated_data, byte_length);
     return nullptr;
   }
 
   return store;
 #else
-  fprintf(stderr, "CreateBackingStore: Sandbox is not enabled\n");
   return ArrayBuffer::NewBackingStore(data, byte_length, deleter, deleter_data);
 #endif
 }
