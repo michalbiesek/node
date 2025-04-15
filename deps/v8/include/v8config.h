@@ -491,7 +491,8 @@ path. Add it with -I<path> to the command line
 # define V8_ASSUME USE
 #endif
 
-// Prefer c++20 std::assume_aligned
+// Prefer c++20 std::assume_aligned. Don't use it on MSVC though, because it's
+// not happy with our large 4GB alignment values.
 #if __cplusplus >= 202002L && defined(__cpp_lib_assume_aligned) && !V8_CC_MSVC
 # define V8_ASSUME_ALIGNED(ptr, alignment) \
   std::assume_aligned<(alignment)>(ptr)
